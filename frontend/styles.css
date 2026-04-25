@@ -154,6 +154,7 @@ body {
 .recent-desc   { font-size: 14px; font-weight: 600; }
 .recent-meta   { font-size: 12px; color: var(--text-muted); }
 .recent-amount { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.recent-right  { display: flex; align-items: center; gap: 8px; }
 
 /* ---------- Chart containers (page 2) ---------- */
 .chart-wrap { position: relative; max-width: 300px; margin: 0 auto; padding: 8px 0; }

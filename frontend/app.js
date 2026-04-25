@@ -30,7 +30,6 @@ const categoryForm   = $('#category-form');
 const expCategory    = $('#exp-category');
 const expDate        = $('#exp-date');
 const monthFilter    = $('#month-filter');
-const tableBody      = $('#expenses-table tbody');
 const toastEl        = $('#toast');
 const connectSection = $('#connect-section');
 const appContent     = $('#app-content');
@@ -201,7 +200,7 @@ function applyFilter() {
   closeFilterPanel();
   renderPage1();
   renderYearStats();
-  renderTable();
+  renderExpensesList();
   chartsDirty = true;
 }
 
@@ -213,7 +212,7 @@ function clearFilter() {
   closeFilterPanel();
   renderPage1();
   renderYearStats();
-  renderTable();
+  renderExpensesList();
   chartsDirty = true;
 }
 
@@ -337,36 +336,10 @@ function renderBudgetBars() {
   }).join('');
 }
 
-// Page 1 — recent 5 expenses
-function renderRecentExpenses() {
-  const recentEl = $('#recent-list');
-  const emojiMap = {};
-  state.limits.forEach(c => { emojiMap[c.category] = c.emoji || ''; });
-
-  const tx = getFilteredTransactions()
-    .slice().sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 5);
-
-  if (tx.length === 0) {
-    recentEl.innerHTML = '<p class="muted">No expenses</p>';
-    return;
-  }
-  recentEl.innerHTML = tx.map(t => `
-    <div class="recent-item">
-      <div class="recent-left">
-        <div class="recent-emoji">${emojiMap[t.category] || '💳'}</div>
-        <div>
-          <div class="recent-desc">${escapeHtml(t.description || t.category)}</div>
-          <div class="recent-meta">${escapeHtml(t.category)} · ${escapeHtml(t.date)}</div>
-        </div>
-      </div>
-      <span class="recent-amount">−${fmtMoney(t.amount)}</span>
-    </div>`).join('');
-}
 
 function renderPage1() {
   renderTotalHero();
   renderBudgetBars();
-  renderRecentExpenses();
 }
 
 // Page 2 — Chart.js charts
@@ -482,29 +455,36 @@ function renderYearStats() {
     }).join('') || '<p style="opacity:.75;font-size:13px;margin:4px 0">No expenses this year yet</p>';
 }
 
-// Page 3 — expenses table
-function renderTable() {
-  const tx = getFilteredTransactions().slice().sort((a, b) => a.date < b.date ? 1 : -1);
-
-  if (tx.length === 0) {
-    tableBody.innerHTML = '<tr><td colspan="5" class="muted">No expenses yet</td></tr>';
-    return;
-  }
+// Page 3 — expenses list
+function renderExpensesList() {
+  const listEl   = $('#expenses-list');
   const emojiMap = {};
   state.limits.forEach(c => { emojiMap[c.category] = c.emoji || ''; });
 
-  tableBody.innerHTML = tx.map(t => `
-    <tr>
-      <td>${escapeHtml(t.date)}</td>
-      <td>${emojiMap[t.category] ? emojiMap[t.category] + ' ' : ''}${escapeHtml(t.category)}</td>
-      <td>${escapeHtml(t.description || '')}</td>
-      <td class="right">${fmtMoney(t.amount)}</td>
-      <td class="td-action">
+  const tx = getFilteredTransactions().slice().sort((a, b) => a.date < b.date ? 1 : -1);
+
+  if (tx.length === 0) {
+    listEl.innerHTML = '<p class="muted">No expenses yet</p>';
+    return;
+  }
+
+  listEl.innerHTML = tx.map(t => `
+    <div class="recent-item">
+      <div class="recent-left">
+        <div class="recent-emoji">${emojiMap[t.category] || '💳'}</div>
+        <div>
+          <div class="recent-desc">${escapeHtml(t.description || t.category)}</div>
+          <div class="recent-meta">${escapeHtml(t.category)} · ${escapeHtml(t.date)}</div>
+        </div>
+      </div>
+      <div class="recent-right">
+        <span class="recent-amount">−${fmtMoney(t.amount)}</span>
         <button class="btn-icon btn-icon-danger"
-          data-action="delete-tx" data-id="${escapeHtml(t.id || '')}"
+          data-action="delete-tx"
+          data-id="${escapeHtml(t.id)}"
           title="Delete">🗑️</button>
-      </td>
-    </tr>`).join('');
+      </div>
+    </div>`).join('');
 }
 
 // Page 4 — categories list
@@ -527,7 +507,10 @@ function renderCategoriesList() {
       </div>
       <div class="cat-actions">
         <button class="btn-icon" data-action="edit-cat" data-cat="${escapeHtml(c.category)}" title="Edit">✏️</button>
-        <button class="btn-icon btn-icon-danger" data-action="delete-cat" data-cat="${escapeHtml(c.category)}" title="Delete">🗑️</button>
+        <button class="btn-icon btn-icon-danger"
+          data-action="delete-tx"
+          data-id="${escapeHtml(t.id)}"
+          title="Delete">🗑️</button>
       </div>
     </div>`;
   }).join('');
@@ -537,7 +520,7 @@ function renderAll() {
   renderCategoryOptions();
   renderPage1();
   renderYearStats();
-  renderTable();
+  renderExpensesList();
   renderCategoriesList();
   chartsDirty = true;
 }
@@ -563,29 +546,22 @@ async function loadData() {
 
 // ---------- Delete handlers ----------
 
-async function confirmDeleteTransaction(id) {
+async function deleteTransaction(id) {
   if (!id) { toast('Cannot delete: missing ID', 'error'); return; }
-  if (!confirm('Delete this expense?')) return;
   try {
     await apiPost({ action: 'deleteTransaction', id });
-    state.transactions = state.transactions.filter(t => t.id !== id);
-    renderPage1();
-    renderYearStats();
-    renderTable();
-    chartsDirty = true;
-    toast('Expense deleted');
+    await loadData();
+    toast('Expense deleted ✅');
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   }
 }
 
 async function confirmDeleteCategory(category) {
-  if (!confirm(`Delete category "${category}"?\nTransactions in this category are kept.`)) return;
   try {
     await apiPost({ action: 'deleteCategory', category });
-    state.limits = await apiGet('getLimits');
-    renderAll();
-    toast('Category deleted');
+    await loadData();
+    toast('Category deleted ✅');
   } catch (err) {
     toast('Error: ' + err.message, 'error');
   }
@@ -607,7 +583,7 @@ document.addEventListener('click', e => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const { action, id, cat } = btn.dataset;
-  if (action === 'delete-tx')  confirmDeleteTransaction(id);
+  if (action === 'delete-tx')  deleteTransaction(id);
   if (action === 'edit-cat')   editCategory(cat);
   if (action === 'delete-cat') confirmDeleteCategory(cat);
 });
@@ -657,7 +633,7 @@ expenseForm.addEventListener('submit', async e => {
     closeAddModal();
     renderPage1();
     renderYearStats();
-    renderTable();
+    renderExpensesList();
     chartsDirty = true;
     toast('Expense added ✅');
   } catch (err) {

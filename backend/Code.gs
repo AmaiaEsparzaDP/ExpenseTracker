@@ -142,14 +142,15 @@ function getTransactions(ss) {
   if (values.length <= 1) return [];
 
   return values.slice(1)
-    .filter(r => r[0] !== '' && r[1] !== '')
-    .map(r => ({
-      id:          String(r[4] || ''),
+    .map((r, i) => ({
+      id:          String(r[4] || i + 2),
+      row:         i + 2,
       date:        formatDate(r[0]),
       category:    String(r[1]),
       amount:      Number(r[2]) || 0,
       description: String(r[3] || '')
-    }));
+    }))
+    .filter(t => t.date && t.category);
 }
 
 function getLimits(ss) {
@@ -184,17 +185,21 @@ function addTransaction(ss, data) {
 }
 
 function deleteTransaction(ss, data) {
-  const sheet  = getSheet(ss, SHEET_TRANSACTIONS);
-  const id     = String(data.id || '');
-  if (!id) throw new Error('id is required');
+  const id = String(data.id || '').trim();
+  if (!id) throw new Error('Invalid transaction ID');
 
+  const sheet = getSheet(ss, SHEET_TRANSACTIONS);
   const values = sheet.getDataRange().getValues();
+
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][4]) === id) {
+    const rowId = String(values[i][4] || i + 2).trim();
+
+    if (rowId === id) {
       sheet.deleteRow(i + 1);
       return { deleted: true };
     }
   }
+
   throw new Error('Transaction not found');
 }
 

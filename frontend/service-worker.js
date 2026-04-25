@@ -1,4 +1,4 @@
-const CACHE_NAME = 'expense-tracker-v2';
+const CACHE_NAME = 'expense-tracker-v3';
 
 // Core files that must be cached for offline use
 const CORE_ASSETS = [
