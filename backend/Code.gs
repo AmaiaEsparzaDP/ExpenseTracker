@@ -1,18 +1,17 @@
 /**
  * Expense Tracker - Google Apps Script Backend (multi-user)
  * ----------------------------------------------------------
- * Every request must include a spreadsheetId (except setupSheet,
- * which receives a sheetUrl and returns the spreadsheetId).
+ * Every request must include a spreadsheetId (except setupSheet).
  *
- * GET endpoints:
- *   ?action=getTransactions&spreadsheetId=...
- *   ?action=getLimits&spreadsheetId=...
- *   ?action=getAll&spreadsheetId=...
+ * GET:  ?action=getTransactions&spreadsheetId=...
+ *       ?action=getLimits&spreadsheetId=...
  *
- * POST endpoints (body is JSON sent as text/plain):
- *   { action: "setupSheet",       sheetUrl: "..." }
- *   { action: "addTransaction",   spreadsheetId: "...", transaction: { date, category, amount, description } }
- *   { action: "addOrUpdateLimit", spreadsheetId: "...", category, monthlyLimit, emoji }
+ * POST (body JSON sent as text/plain):
+ *   { action: "setupSheet",        sheetUrl }
+ *   { action: "addTransaction",    spreadsheetId, transaction: {date,category,amount,description} }
+ *   { action: "deleteTransaction", spreadsheetId, id }
+ *   { action: "addOrUpdateLimit",  spreadsheetId, category, monthlyLimit, emoji }
+ *   { action: "deleteCategory",    spreadsheetId, category }
  */
 
 const SHEET_TRANSACTIONS = 'Transactions';
@@ -36,13 +35,12 @@ function openSheet(spreadsheetId) {
   return SpreadsheetApp.openById(spreadsheetId);
 }
 
-// Get (or create with headers) a named sheet inside a spreadsheet
 function getSheet(ss, name) {
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
     if (name === SHEET_TRANSACTIONS) {
-      sheet.appendRow(['Date', 'Category', 'Amount', 'Description', 'CreatedAt']);
+      sheet.appendRow(['Date', 'Category', 'Amount', 'Description', 'ID']);
     } else if (name === SHEET_LIMITS) {
       sheet.appendRow(['Category', 'MonthlyLimit', 'Emoji']);
     } else if (name === SHEET_SETTINGS) {
@@ -52,10 +50,9 @@ function getSheet(ss, name) {
   return sheet;
 }
 
-// Pull the spreadsheetId out of any Google Sheets URL
 function extractSpreadsheetId(url) {
   const match = String(url).match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!match) throw new Error('Could not extract spreadsheet ID from URL. Make sure you paste a valid Google Sheets URL.');
+  if (!match) throw new Error('Could not extract spreadsheet ID from URL. Paste a valid Google Sheets URL.');
   return match[1];
 }
 
@@ -64,8 +61,8 @@ function extractSpreadsheetId(url) {
 
 function doGet(e) {
   try {
-    const params = (e && e.parameter) || {};
-    const action = params.action || '';
+    const params        = (e && e.parameter) || {};
+    const action        = params.action || '';
     const spreadsheetId = params.spreadsheetId || '';
 
     if (!spreadsheetId) {
@@ -74,17 +71,10 @@ function doGet(e) {
 
     const ss = openSheet(spreadsheetId);
 
-    if (action === 'getTransactions') {
-      return jsonResponse({ ok: true, data: getTransactions(ss) });
-    }
-    if (action === 'getLimits') {
-      return jsonResponse({ ok: true, data: getLimits(ss) });
-    }
+    if (action === 'getTransactions') return jsonResponse({ ok: true, data: getTransactions(ss) });
+    if (action === 'getLimits')       return jsonResponse({ ok: true, data: getLimits(ss) });
     if (action === 'getAll') {
-      return jsonResponse({
-        ok: true,
-        data: { transactions: getTransactions(ss), limits: getLimits(ss) }
-      });
+      return jsonResponse({ ok: true, data: { transactions: getTransactions(ss), limits: getLimits(ss) } });
     }
 
     return jsonResponse({ ok: false, error: 'Unknown action: ' + action });
@@ -105,24 +95,23 @@ function doPost(e) {
 
     const action = body.action || '';
 
-    // setupSheet does not need a spreadsheetId — it creates one from a URL
+    // setupSheet doesn't need a spreadsheetId — it derives one from the URL
     if (action === 'setupSheet') {
       return jsonResponse(setupSheet(body.sheetUrl));
     }
 
     const spreadsheetId = body.spreadsheetId || '';
     if (!spreadsheetId) {
-      return jsonResponse({ ok: false, error: 'spreadsheetId is required in request body' });
+      return jsonResponse({ ok: false, error: 'spreadsheetId is required' });
     }
 
     const ss = openSheet(spreadsheetId);
 
-    if (action === 'addTransaction') {
-      return jsonResponse({ ok: true, data: addTransaction(ss, body) });
-    }
-    if (action === 'addOrUpdateLimit' || action === 'addCategory') {
-      return jsonResponse({ ok: true, data: addOrUpdateLimit(ss, body) });
-    }
+    if (action === 'addTransaction')              return jsonResponse({ ok: true, data: addTransaction(ss, body) });
+    if (action === 'deleteTransaction')           return jsonResponse({ ok: true, data: deleteTransaction(ss, body) });
+    if (action === 'addOrUpdateLimit' ||
+        action === 'addCategory')                 return jsonResponse({ ok: true, data: addOrUpdateLimit(ss, body) });
+    if (action === 'deleteCategory')              return jsonResponse({ ok: true, data: deleteCategory(ss, body) });
 
     return jsonResponse({ ok: false, error: 'Unknown action: ' + action });
   } catch (err) {
@@ -138,29 +127,24 @@ function setupSheet(sheetUrl) {
     if (!sheetUrl) throw new Error('sheetUrl is required');
     const spreadsheetId = extractSpreadsheetId(sheetUrl);
     const ss = SpreadsheetApp.openById(spreadsheetId);
-
     getSheet(ss, SHEET_TRANSACTIONS);
     getSheet(ss, SHEET_LIMITS);
     getSheet(ss, SHEET_SETTINGS);
-
-    return {
-      success: true,
-      spreadsheetId: spreadsheetId,
-      message: 'Sheet connected and prepared successfully'
-    };
+    return { success: true, spreadsheetId: spreadsheetId, message: 'Sheet connected and prepared successfully' };
   } catch (err) {
     return { success: false, error: String(err) };
   }
 }
 
 function getTransactions(ss) {
-  const sheet = getSheet(ss, SHEET_TRANSACTIONS);
+  const sheet  = getSheet(ss, SHEET_TRANSACTIONS);
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return [];
 
   return values.slice(1)
     .filter(r => r[0] !== '' && r[1] !== '')
     .map(r => ({
+      id:          String(r[4] || ''),
       date:        formatDate(r[0]),
       category:    String(r[1]),
       amount:      Number(r[2]) || 0,
@@ -169,7 +153,7 @@ function getTransactions(ss) {
 }
 
 function getLimits(ss) {
-  const sheet = getSheet(ss, SHEET_LIMITS);
+  const sheet  = getSheet(ss, SHEET_LIMITS);
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return [];
 
@@ -184,19 +168,34 @@ function getLimits(ss) {
 
 function addTransaction(ss, data) {
   const sheet = getSheet(ss, SHEET_TRANSACTIONS);
+  const tx    = data.transaction || data;
 
-  // Accept both { transaction: {...} } and flat body for convenience
-  const tx = data.transaction || data;
   const date        = tx.date ? new Date(tx.date) : new Date();
   const category    = String(tx.category || '').trim();
   const amount      = Number(tx.amount) || 0;
   const description = String(tx.description || '').trim();
+  const id          = Utilities.getUuid();
 
   if (!category) throw new Error('Category is required');
   if (amount <= 0) throw new Error('Amount must be greater than 0');
 
-  sheet.appendRow([date, category, amount, description, new Date()]);
-  return { date: formatDate(date), category, amount, description };
+  sheet.appendRow([date, category, amount, description, id]);
+  return { id, date: formatDate(date), category, amount, description };
+}
+
+function deleteTransaction(ss, data) {
+  const sheet  = getSheet(ss, SHEET_TRANSACTIONS);
+  const id     = String(data.id || '');
+  if (!id) throw new Error('id is required');
+
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][4]) === id) {
+      sheet.deleteRow(i + 1);
+      return { deleted: true };
+    }
+  }
+  throw new Error('Transaction not found');
 }
 
 function addOrUpdateLimit(ss, data) {
@@ -217,6 +216,21 @@ function addOrUpdateLimit(ss, data) {
 
   sheet.appendRow([category, monthlyLimit, emoji]);
   return { category, monthlyLimit, emoji, updated: false };
+}
+
+function deleteCategory(ss, data) {
+  const sheet    = getSheet(ss, SHEET_LIMITS);
+  const category = String(data.category || '').trim();
+  if (!category) throw new Error('category is required');
+
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).toLowerCase() === category.toLowerCase()) {
+      sheet.deleteRow(i + 1);
+      return { deleted: true };
+    }
+  }
+  throw new Error('Category not found');
 }
 
 

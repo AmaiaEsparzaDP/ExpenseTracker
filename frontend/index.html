@@ -10,20 +10,23 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
 </head>
 <body>
+
   <header class="app-header">
-    <h1>💰 Expense Tracker</h1>
-    <p class="subtitle">Powered by Google Sheets</p>
+    <h1>💰 Expenses</h1>
+    <div id="month-filter-wrap" style="display:none">
+      <input type="month" id="month-filter" />
+    </div>
   </header>
 
   <main class="container">
 
-    <!-- ============ SHEET CONNECTION (shown when not connected) ============ -->
+    <!-- ===== SHEET CONNECTION ===== -->
     <section id="connect-section" class="card connect-card">
       <h2>🔗 Connect your Google Sheet</h2>
       <p class="connect-help">
         1. Create an empty Google Sheet in your Drive.<br>
         2. Share it with the Apps Script owner account (Editor access).<br>
-        3. Paste the Sheet URL below and click Connect.
+        3. Paste the Sheet URL below.
       </p>
       <form id="connect-form">
         <label>
@@ -36,7 +39,7 @@
       <p id="connect-status" class="connect-status"></p>
     </section>
 
-    <!-- ============ CONNECTED STATUS BAR (shown when connected) ============ -->
+    <!-- ===== CONNECTED BAR ===== -->
     <div id="connected-bar" class="card connected-bar" style="display:none">
       <div class="connected-info">
         <span class="connected-badge">✅ Sheet connected</span>
@@ -45,103 +48,145 @@
       <button id="disconnect-btn" class="btn btn-outline">Disconnect</button>
     </div>
 
-    <!-- ============ APP CONTENT (shown after connecting) ============ -->
+    <!-- ===== APP PAGES ===== -->
     <div id="app-content" style="display:none">
 
-      <!-- TOTAL -->
-      <section class="card total-card">
-        <div>
-          <div class="total-label">Total this month</div>
-          <div id="total-amount" class="total-amount">0.00 €</div>
-        </div>
-        <div class="filter">
-          <label for="month-filter">Month</label>
-          <input type="month" id="month-filter" />
-        </div>
-      </section>
+      <!-- PAGE 1: Inicio -->
+      <div id="page1" class="page">
 
-      <div class="grid">
-
-        <!-- ADD EXPENSE -->
-        <section class="card">
-          <h2>➕ Add expense</h2>
-          <form id="expense-form">
-            <label>
-              Date
-              <input type="date" id="exp-date" required />
-            </label>
-            <label>
-              Category
-              <select id="exp-category" required></select>
-            </label>
-            <label>
-              Amount (€)
-              <input type="number" id="exp-amount" step="0.01" min="0.01" required />
-            </label>
-            <label>
-              Description
-              <input type="text" id="exp-description" placeholder="Lunch, taxi..." />
-            </label>
-            <button type="submit" class="btn btn-primary">Add expense</button>
-          </form>
+        <section class="card donut-card">
+          <div class="donut-wrap">
+            <svg id="donut-chart" viewBox="0 0 100 100" class="donut-svg"></svg>
+          </div>
+          <div id="donut-legend" class="donut-legend"></div>
         </section>
 
-        <!-- ADD / UPDATE CATEGORY -->
+        <section class="card">
+          <h2>🕐 Recent expenses</h2>
+          <div id="recent-list" class="recent-list">
+            <p class="muted">No expenses this month</p>
+          </div>
+        </section>
+
+      </div><!-- #page1 -->
+
+      <!-- PAGE 2: Gastos / Stats -->
+      <div id="page2" class="page" style="display:none">
+
+        <section class="card year-card">
+          <div class="year-label">Total this year</div>
+          <div id="year-total" class="year-amount">0.00 €</div>
+          <div id="year-breakdown" class="year-breakdown"></div>
+        </section>
+
+        <section class="card">
+          <h2>📊 This month</h2>
+          <div id="category-summary" class="summary-list">
+            <p class="muted">Loading…</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>📋 Expenses</h2>
+          <div class="table-wrapper">
+            <table id="expenses-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th class="right">Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="5" class="muted">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div><!-- #page2 -->
+
+      <!-- PAGE 3: Categorías -->
+      <div id="page3" class="page" style="display:none">
+
         <section class="card">
           <h2>🏷️ Add / update category</h2>
           <form id="category-form">
-            <label>
-              Name
+            <label>Name
               <input type="text" id="cat-name" placeholder="Food" required />
             </label>
-            <label>
-              Emoji
+            <label>Emoji
               <input type="text" id="cat-emoji" placeholder="🍔" maxlength="4" />
             </label>
             <label>
-              Monthly limit (€)
-              <input type="number" id="cat-limit" step="0.01" min="0" required />
+              Monthly limit (€) <span class="optional">optional</span>
+              <input type="number" id="cat-limit" step="0.01" min="0"
+                placeholder="Leave blank = no limit" />
             </label>
             <button type="submit" class="btn btn-secondary">Save category</button>
           </form>
         </section>
 
-      </div>
+        <section class="card">
+          <h2>📂 Your categories</h2>
+          <div id="categories-list" class="categories-list">
+            <p class="muted">No categories yet</p>
+          </div>
+        </section>
 
-      <!-- CATEGORY SUMMARY -->
-      <section class="card">
-        <h2>📊 Category summary</h2>
-        <div id="category-summary" class="summary-list">
-          <p class="muted">Loading...</p>
-        </div>
-      </section>
+      </div><!-- #page3 -->
 
-      <!-- EXPENSES LIST -->
-      <section class="card">
-        <h2>📋 Expenses</h2>
-        <div class="table-wrapper">
-          <table id="expenses-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Description</th>
-                <th class="right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="4" class="muted">Loading...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-    </div><!-- /#app-content -->
+    </div><!-- #app-content -->
 
   </main>
 
-  <div id="toast" class="toast"></div>
+  <!-- ===== ADD EXPENSE MODAL (bottom sheet) ===== -->
+  <div id="add-modal" class="modal" style="display:none">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>➕ Add expense</h2>
+        <button id="modal-close" class="btn-icon btn-modal-close">✕</button>
+      </div>
+      <form id="expense-form">
+        <label>Date
+          <input type="date" id="exp-date" required />
+        </label>
+        <label>Category
+          <select id="exp-category" required></select>
+        </label>
+        <label>Amount (€)
+          <input type="number" id="exp-amount" step="0.01" min="0.01" required />
+        </label>
+        <label>Description
+          <input type="text" id="exp-description" placeholder="Lunch, taxi…" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-full">Add expense</button>
+      </form>
+    </div>
+  </div>
 
+  <!-- ===== BOTTOM NAVIGATION ===== -->
+  <nav id="bottom-nav" class="bottom-nav" style="display:none">
+    <button class="nav-btn active" data-page="page1">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Inicio</span>
+    </button>
+    <button class="nav-btn" data-page="page2">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Gastos</span>
+    </button>
+    <button id="add-btn" class="nav-add-btn" aria-label="Add expense">＋</button>
+    <button class="nav-btn" data-page="page3">
+      <span class="nav-icon">🏷️</span>
+      <span class="nav-label">Categorías</span>
+    </button>
+  </nav>
+
+  <div id="toast" class="toast"></div>
   <script src="app.js"></script>
 </body>
 </html>

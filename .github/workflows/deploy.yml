@@ -30,7 +30,7 @@ jobs:
       - name: Upload frontend as Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ExpenseTrackerHackupc/frontend
+          path: frontend
 
       - name: Deploy to GitHub Pages
         id: deployment
