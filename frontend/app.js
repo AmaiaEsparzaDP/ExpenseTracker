@@ -372,6 +372,7 @@ function renderDoughnutChart() {
   const ctx        = $('#doughnut-canvas').getContext('2d');
   const tx         = getFilteredTransactions();
   const spentByCat = {};
+
   tx.forEach(t => {
     spentByCat[t.category] = (spentByCat[t.category] || 0) + Number(t.amount || 0);
   });
@@ -380,21 +381,60 @@ function renderDoughnutChart() {
   const data   = Object.values(spentByCat);
   const colors = labels.map(cat => catColor(cat));
 
+  // 🔥 PLUGIN TEXTO CENTRO
+  const centerTextPlugin = {
+    id: 'centerText',
+    beforeDraw(chart) {
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      if (!meta || !meta.data || !meta.data.length) return;
+
+      const x = meta.data[0].x;
+      const y = meta.data[0].y;
+
+      const total = data.reduce((a, b) => a + b, 0);
+
+      ctx.save();
+      ctx.font = 'bold 18px system-ui';
+      ctx.fillStyle = '#1e293b';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillText(fmtMoney(total), x, y);
+
+      ctx.restore();
+    }
+  };
+
   if (doughnutChart) doughnutChart.destroy();
+
   doughnutChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels,
-      datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+      datasets: [{
+        data,
+        backgroundColor: colors,
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
     },
     options: {
       responsive: true,
       plugins: {
-        legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } },
-        tooltip: { callbacks: { label: c => ` ${fmtMoney(c.parsed)}` } }
+        legend: {
+          position: 'bottom',
+          labels: { padding: 16, font: { size: 12 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: c => ` ${fmtMoney(c.parsed)}`
+          }
+        }
       },
       cutout: '65%'
-    }
+    },
+    plugins: [centerTextPlugin] 
   });
 }
 
