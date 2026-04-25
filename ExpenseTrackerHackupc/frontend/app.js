@@ -1,53 +1,118 @@
 /* =========================================================
  *  Expense Tracker - Frontend logic
  * =========================================================
- *  Talks to the Google Apps Script Web App via fetch().
- *  Keep all UI logic on the frontend; backend is "dumb storage".
+ *  After deploying Apps Script, paste the Web App URL below.
+ *  Each user connects their own Google Sheet via the UI.
  * ========================================================= */
 
 // 🔧 PASTE your Apps Script Web App URL here (after deploying)
 //    Example: https://script.google.com/macros/s/AKfy.../exec
 const API_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
 
-// In-memory state
+// In-memory state — spreadsheetId persists across reloads via localStorage
 const state = {
   transactions: [],
   limits: [],
-  filterMonth: '' // 'YYYY-MM', empty = all
+  filterMonth: '',
+  spreadsheetId: localStorage.getItem('spreadsheetId') || ''
 };
 
 // ---------------- DOM refs ----------------
 const $ = (sel) => document.querySelector(sel);
-const expenseForm   = $('#expense-form');
-const categoryForm  = $('#category-form');
-const expCategory   = $('#exp-category');
-const expDate       = $('#exp-date');
-const monthFilter   = $('#month-filter');
-const totalAmountEl = $('#total-amount');
-const summaryEl     = $('#category-summary');
-const tableBody     = $('#expenses-table tbody');
-const toastEl       = $('#toast');
+const expenseForm    = $('#expense-form');
+const categoryForm   = $('#category-form');
+const expCategory    = $('#exp-category');
+const expDate        = $('#exp-date');
+const monthFilter    = $('#month-filter');
+const totalAmountEl  = $('#total-amount');
+const summaryEl      = $('#category-summary');
+const tableBody      = $('#expenses-table tbody');
+const toastEl        = $('#toast');
+const connectSection = $('#connect-section');
+const connectedBar   = $('#connected-bar');
+const appContent     = $('#app-content');
+const connectForm    = $('#connect-form');
+const sheetUrlInput  = $('#sheet-url');
+const connectStatus  = $('#connect-status');
+const connectedIdEl  = $('#connected-id');
+const disconnectBtn  = $('#disconnect-btn');
 
 
 // ---------------- API helpers ----------------
 
 async function apiGet(action) {
-  const res = await fetch(API_URL + '?action=' + encodeURIComponent(action));
+  if (!state.spreadsheetId) throw new Error('No sheet connected');
+  const url = API_URL
+    + '?action=' + encodeURIComponent(action)
+    + '&spreadsheetId=' + encodeURIComponent(state.spreadsheetId);
+  const res = await fetch(url);
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Request failed');
   return json.data;
 }
 
 async function apiPost(payload) {
+  // Always attach spreadsheetId so the backend knows which sheet to use.
   // text/plain avoids the CORS preflight that blocks Apps Script.
+  const body = { ...payload, spreadsheetId: state.spreadsheetId };
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(body)
   });
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Request failed');
   return json.data;
+}
+
+
+// ---------------- Sheet connection ----------------
+
+async function connectSheet(sheetUrl) {
+  connectStatus.textContent = 'Connecting…';
+  connectStatus.className = 'connect-status';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'setupSheet', sheetUrl })
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Connection failed');
+
+    state.spreadsheetId = json.spreadsheetId;
+    localStorage.setItem('spreadsheetId', json.spreadsheetId);
+    showApp();
+    toast('Sheet connected ✅');
+  } catch (err) {
+    connectStatus.textContent = '❌ ' + err.message;
+    connectStatus.className = 'connect-status error';
+  }
+}
+
+function disconnectSheet() {
+  state.spreadsheetId = '';
+  localStorage.removeItem('spreadsheetId');
+  state.transactions = [];
+  state.limits = [];
+  showConnectionPanel();
+}
+
+function showApp() {
+  connectSection.style.display = 'none';
+  connectedBar.style.display = '';
+  appContent.style.display = '';
+  connectedIdEl.textContent = state.spreadsheetId;
+  loadData();
+}
+
+function showConnectionPanel() {
+  connectSection.style.display = '';
+  connectedBar.style.display = 'none';
+  appContent.style.display = 'none';
+  connectStatus.textContent = '';
+  sheetUrlInput.value = '';
 }
 
 
@@ -64,12 +129,10 @@ function fmtMoney(n) {
 }
 
 function todayISO() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
 }
 
 function monthOf(dateStr) {
-  // 'YYYY-MM-DD' -> 'YYYY-MM'
   return (dateStr || '').slice(0, 7);
 }
 
@@ -112,13 +175,11 @@ function renderTotal() {
 function renderSummary() {
   const tx = getFilteredTransactions();
 
-  // Sum spent per category
   const spentByCat = {};
   tx.forEach(t => {
     spentByCat[t.category] = (spentByCat[t.category] || 0) + Number(t.amount || 0);
   });
 
-  // Build a unified list: all categories from limits, plus any orphan ones.
   const seen = new Set();
   const items = state.limits.map(c => {
     seen.add(c.category);
@@ -173,14 +234,13 @@ function renderSummary() {
 function renderTable() {
   const tx = getFilteredTransactions()
     .slice()
-    .sort((a, b) => (a.date < b.date ? 1 : -1)); // newest first
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
 
   if (tx.length === 0) {
     tableBody.innerHTML = '<tr><td colspan="4" class="muted">No expenses yet</td></tr>';
     return;
   }
 
-  // Map category -> emoji for display
   const emojiMap = {};
   state.limits.forEach(c => { emojiMap[c.category] = c.emoji || ''; });
 
@@ -231,24 +291,37 @@ async function loadData() {
 
 // ---------------- Event handlers ----------------
 
+connectForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await connectSheet(sheetUrlInput.value.trim());
+});
+
+disconnectBtn.addEventListener('click', () => {
+  if (confirm('Disconnect this sheet? Your data in Google Sheets is not affected.')) {
+    disconnectSheet();
+  }
+});
+
 expenseForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const payload = {
     action: 'addTransaction',
-    date: expDate.value || todayISO(),
-    category: expCategory.value,
-    amount: parseFloat($('#exp-amount').value),
-    description: $('#exp-description').value
+    transaction: {
+      date: expDate.value || todayISO(),
+      category: expCategory.value,
+      amount: parseFloat($('#exp-amount').value),
+      description: $('#exp-description').value
+    }
   };
 
-  if (!payload.category) {
+  if (!payload.transaction.category) {
     toast('Pick a category first', 'error');
     return;
   }
 
   try {
     const saved = await apiPost(payload);
-    state.transactions.push(saved); // optimistic
+    state.transactions.push(saved);
     renderTotal();
     renderSummary();
     renderTable();
@@ -263,7 +336,7 @@ expenseForm.addEventListener('submit', async (e) => {
 categoryForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const payload = {
-    action: 'addCategory',
+    action: 'addOrUpdateLimit',
     category: $('#cat-name').value.trim(),
     emoji: $('#cat-emoji').value.trim(),
     monthlyLimit: parseFloat($('#cat-limit').value) || 0
@@ -271,7 +344,6 @@ categoryForm.addEventListener('submit', async (e) => {
 
   try {
     await apiPost(payload);
-    // Reload limits from server (so we get updates merged correctly)
     state.limits = await apiGet('getLimits');
     renderAll();
     categoryForm.reset();
@@ -282,7 +354,7 @@ categoryForm.addEventListener('submit', async (e) => {
 });
 
 monthFilter.addEventListener('change', () => {
-  state.filterMonth = monthFilter.value; // '' if cleared
+  state.filterMonth = monthFilter.value;
   renderTotal();
   renderSummary();
   renderTable();
@@ -292,18 +364,27 @@ monthFilter.addEventListener('change', () => {
 // ---------------- Init ----------------
 
 (function init() {
-  expDate.value = todayISO();
-  // Default month filter to current month
-  monthFilter.value = todayISO().slice(0, 7);
-  state.filterMonth = monthFilter.value;
-
   if (API_URL.includes('PASTE_YOUR_WEB_APP_URL_HERE')) {
-    summaryEl.innerHTML =
-      '<p class="muted">⚠️ Open <code>app.js</code> and set <code>API_URL</code> to your deployed Apps Script Web App URL.</p>';
-    tableBody.innerHTML =
-      '<tr><td colspan="4" class="muted">Set API_URL in app.js to start</td></tr>';
+    connectSection.querySelector('h2').textContent = '⚠️ Setup required';
+    connectSection.querySelector('.connect-help').innerHTML =
+      'Open <code>app.js</code> and replace <code>PASTE_YOUR_WEB_APP_URL_HERE</code> '
+      + 'with your deployed Apps Script Web App URL, then reload the page.';
+    connectForm.style.display = 'none';
     return;
   }
 
-  loadData();
+  expDate.value = todayISO();
+  monthFilter.value = todayISO().slice(0, 7);
+  state.filterMonth = monthFilter.value;
+
+  if (state.spreadsheetId) {
+    showApp();
+  } else {
+    showConnectionPanel();
+  }
 })();
+
+// PWA: register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js').catch(console.error);
+}

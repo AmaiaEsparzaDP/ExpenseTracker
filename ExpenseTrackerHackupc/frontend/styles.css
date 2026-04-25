@@ -161,3 +161,61 @@ th { font-size: 12px; text-transform: uppercase; color: #6b7280; letter-spacing:
 .toast.show { transform: translateX(-50%) translateY(0); }
 .toast.error { background: #b91c1c; }
 .toast.success { background: #059669; }
+
+/* ---------- Sheet connection ---------- */
+.connect-card { border: 2px dashed #c7d2fe; background: #eef2ff; }
+.connect-card h2 { color: #4338ca; }
+
+.connect-help {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.7;
+  margin: 0 0 16px;
+}
+
+.connect-status {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #6b7280;
+  min-height: 20px;
+}
+.connect-status.error { color: #b91c1c; font-weight: 600; }
+
+.connected-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.connected-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.connected-badge {
+  font-size: 14px;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.sheet-id {
+  font-size: 11px;
+  color: #6b7280;
+  word-break: break-all;
+  max-width: 300px;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #6b7280;
+  padding: 7px 14px;
+}
+.btn-outline:hover { background: #f3f4f6; opacity: 1; }
