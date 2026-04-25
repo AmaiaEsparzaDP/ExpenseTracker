@@ -11,8 +11,9 @@ const CORE_ASSETS = [
 
 // Icons are optional — cache them if present, skip if missing
 const OPTIONAL_ASSETS = [
-  './icon-192.png',
-  './icon-512.png'
+  './txerri_txiroa_192_clean.png',
+  './txerri_txiroa_512_clean.png',
+  './txerri_txiroa_192_withoutbackground.png',
 ];
 
 self.addEventListener('install', (e) => {
