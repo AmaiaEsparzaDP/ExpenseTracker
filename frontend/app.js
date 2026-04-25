@@ -29,7 +29,6 @@ const expenseForm    = $('#expense-form');
 const categoryForm   = $('#category-form');
 const expCategory    = $('#exp-category');
 const expDate        = $('#exp-date');
-const monthFilter    = $('#month-filter');
 const toastEl        = $('#toast');
 const connectSection = $('#connect-section');
 const appContent     = $('#app-content');
@@ -173,53 +172,45 @@ function closeAddModal() {
 }
 
 
-// ---------- Filter panel ----------
+// ---------- Filter helpers ----------
 
-function openFilterPanel() {
-  const catFilter = $('#cat-filter');
-  catFilter.innerHTML = '<option value="">All categories</option>';
-  state.limits.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c.category;
-    opt.textContent = (c.emoji ? c.emoji + ' ' : '') + c.category;
-    catFilter.appendChild(opt);
+function syncFilterSelects() {
+  const month = todayISO().slice(0, 7);
+  ['#month-filter', '#month-filter-p3'].forEach(sel => {
+    const el = $(sel);
+    if (el) el.value = state.filterMonth || month;
   });
-  monthFilter.value = state.filterMonth || todayISO().slice(0, 7);
-  if (state.filterCategory) catFilter.value = state.filterCategory;
-  $('#filter-panel').style.display = 'flex';
+  populateCatFilters();
 }
 
-function closeFilterPanel() {
-  $('#filter-panel').style.display = 'none';
+function populateCatFilters() {
+  ['#cat-filter', '#cat-filter-p3'].forEach(sel => {
+    const el = $(sel);
+    if (!el) return;
+    const current = el.value;
+    el.innerHTML = '<option value="">All categories</option>';
+    state.limits.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.category;
+      opt.textContent = (c.emoji ? c.emoji + ' ' : '') + c.category;
+      el.appendChild(opt);
+    });
+    el.value = current;
+  });
 }
 
-function applyFilter() {
-  state.filterMonth    = monthFilter.value;
-  state.filterCategory = $('#cat-filter').value;
-  updateFilterBadge();
-  closeFilterPanel();
+function onFilterChange() {
+  const month = ($('#month-filter') || {}).value || ($('#month-filter-p3') || {}).value || '';
+  const cat   = ($('#cat-filter')   || {}).value || ($('#cat-filter-p3')   || {}).value || '';
+  state.filterMonth    = month;
+  state.filterCategory = cat;
+  // keep both bars in sync
+  ['#month-filter', '#month-filter-p3'].forEach(sel => { const el = $(sel); if (el) el.value = month; });
+  ['#cat-filter',   '#cat-filter-p3'  ].forEach(sel => { const el = $(sel); if (el) el.value = cat;   });
   renderPage1();
   renderYearStats();
   renderExpensesList();
   chartsDirty = true;
-}
-
-function clearFilter() {
-  monthFilter.value    = todayISO().slice(0, 7);
-  state.filterMonth    = monthFilter.value;
-  state.filterCategory = '';
-  updateFilterBadge();
-  closeFilterPanel();
-  renderPage1();
-  renderYearStats();
-  renderExpensesList();
-  chartsDirty = true;
-}
-
-function updateFilterBadge() {
-  const badge  = $('#filter-badge');
-  const active = state.filterMonth || state.filterCategory;
-  badge.style.display = active ? '' : 'none';
 }
 
 
@@ -518,6 +509,7 @@ function renderCategoriesList() {
 
 function renderAll() {
   renderCategoryOptions();
+  syncFilterSelects();
   renderPage1();
   renderYearStats();
   renderExpensesList();
@@ -596,11 +588,10 @@ fab.addEventListener('click', openAddModal);
 $('#modal-close').addEventListener('click', closeAddModal);
 $('#modal-backdrop').addEventListener('click', closeAddModal);
 
-$('#filter-btn').addEventListener('click', openFilterPanel);
-$('#filter-close').addEventListener('click', closeFilterPanel);
-$('#filter-backdrop').addEventListener('click', closeFilterPanel);
-$('#filter-apply').addEventListener('click', applyFilter);
-$('#filter-clear').addEventListener('click', clearFilter);
+['#month-filter', '#month-filter-p3', '#cat-filter', '#cat-filter-p3'].forEach(sel => {
+  const el = $(sel);
+  if (el) el.addEventListener('change', onFilterChange);
+});
 
 connectForm.addEventListener('submit', async e => {
   e.preventDefault();
@@ -680,9 +671,7 @@ categoryForm.addEventListener('submit', async e => {
   }
 
   expDate.value     = todayISO();
-  monthFilter.value = todayISO().slice(0, 7);
-  state.filterMonth = monthFilter.value;
-  updateFilterBadge();
+  state.filterMonth = todayISO().slice(0, 7);
 
   if (state.spreadsheetId) {
     showApp();
