@@ -212,7 +212,6 @@ function onFilterChange() {
   ['#month-filter', '#month-filter-p3'].forEach(sel => { const el = $(sel); if (el) el.value = month; });
   ['#cat-filter',   '#cat-filter-p3'  ].forEach(sel => { const el = $(sel); if (el) el.value = cat;   });
   renderPage1();
-  renderYearStats();
   renderExpensesList();
   chartsDirty = true;
 }
@@ -528,7 +527,6 @@ function renderAll() {
   renderCategoryOptions();
   syncFilterSelects();
   renderPage1();
-  renderYearStats();
   renderExpensesList();
   renderCategoriesList();
   chartsDirty = true;
@@ -556,13 +554,24 @@ async function loadData() {
 // ---------- Delete handlers ----------
 
 async function deleteTransaction(id) {
-  if (!id) { toast('Cannot delete: missing ID', 'error'); return; }
+  if (!id) return;
+
+  const backup = [...state.transactions];
+
+  // 🚀 BORRADO INSTANTÁNEO EN UI
+  state.transactions = state.transactions.filter(t => String(t.id) !== String(id));
+  renderPage1();
+  renderExpensesList();
+  chartsDirty = true;
+
   try {
     await apiPost({ action: 'deleteTransaction', id });
-    await loadData();
-    toast('Expense deleted ✅');
   } catch (err) {
-    toast('Error: ' + err.message, 'error');
+    // 🔁 rollback si falla
+    state.transactions = backup;
+    renderPage1();
+    renderExpensesList();
+    chartsDirty = true;
   }
 }
 
@@ -640,7 +649,6 @@ expenseForm.addEventListener('submit', async e => {
     state.transactions.push(saved);
     closeAddModal();
     renderPage1();
-    renderYearStats();
     renderExpensesList();
     chartsDirty = true;
     toast('Expense added ✅');
