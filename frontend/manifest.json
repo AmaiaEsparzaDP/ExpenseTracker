@@ -2,26 +2,30 @@
   "name": "Txerri Txiroa",
   "short_name": "Txerri",
   "description": "Track your personal expenses",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "index.html",
+  "scope": ".",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f0f4ff",
   "theme_color": "#1e3a8a",
   "icons": [
     {
       "src": "txerri_txiroa_192_clean.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "txerri_txiroa_192_clean.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "txerri_txiroa_512_clean.png",
       "sizes": "512x512",
-      "type": "image/png"
-    },
-    {
-      "src": "txerri_txiroa_192_withoutbackground.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
