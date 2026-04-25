@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>💰 Expense Tracker</h1>
+    <p class="subtitle">Powered by Google Sheets</p>
+  </header>
+
+  <main class="container">
+
+    <!-- ============ TOTAL ============ -->
+    <section class="card total-card">
+      <div>
+        <div class="total-label">Total this month</div>
+        <div id="total-amount" class="total-amount">0.00 €</div>
+      </div>
+      <div class="filter">
+        <label for="month-filter">Month</label>
+        <input type="month" id="month-filter" />
+      </div>
+    </section>
+
+    <div class="grid">
+
+      <!-- ============ ADD EXPENSE ============ -->
+      <section class="card">
+        <h2>➕ Add expense</h2>
+        <form id="expense-form">
+          <label>
+            Date
+            <input type="date" id="exp-date" required />
+          </label>
+          <label>
+            Category
+            <select id="exp-category" required></select>
+          </label>
+          <label>
+            Amount (€)
+            <input type="number" id="exp-amount" step="0.01" min="0.01" required />
+          </label>
+          <label>
+            Description
+            <input type="text" id="exp-description" placeholder="Lunch, taxi..." />
+          </label>
+          <button type="submit" class="btn btn-primary">Add expense</button>
+        </form>
+      </section>
+
+      <!-- ============ ADD CATEGORY ============ -->
+      <section class="card">
+        <h2>🏷️ Add / update category</h2>
+        <form id="category-form">
+          <label>
+            Name
+            <input type="text" id="cat-name" placeholder="Food" required />
+          </label>
+          <label>
+            Emoji
+            <input type="text" id="cat-emoji" placeholder="🍔" maxlength="4" />
+          </label>
+          <label>
+            Monthly limit (€)
+            <input type="number" id="cat-limit" step="0.01" min="0" required />
+          </label>
+          <button type="submit" class="btn btn-secondary">Save category</button>
+        </form>
+      </section>
+
+    </div>
+
+    <!-- ============ PROGRESS / SUMMARY ============ -->
+    <section class="card">
+      <h2>📊 Category summary</h2>
+      <div id="category-summary" class="summary-list">
+        <p class="muted">Loading...</p>
+      </div>
+    </section>
+
+    <!-- ============ EXPENSES LIST ============ -->
+    <section class="card">
+      <h2>📋 Expenses</h2>
+      <div class="table-wrapper">
+        <table id="expenses-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th class="right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" class="muted">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

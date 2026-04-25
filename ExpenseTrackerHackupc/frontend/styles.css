@@ -1,0 +1,163 @@
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: #f5f7fb;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: #fff;
+  padding: 28px 20px;
+  text-align: center;
+}
+.app-header h1 { margin: 0; font-size: 28px; }
+.subtitle { margin: 6px 0 0; opacity: 0.85; font-size: 14px; }
+
+.container {
+  max-width: 1080px;
+  margin: -20px auto 40px;
+  padding: 0 16px;
+}
+
+/* ---------- Cards ---------- */
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+.card h2 { margin: 0 0 16px; font-size: 18px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.grid .card { margin-bottom: 0; }
+
+/* ---------- Total card ---------- */
+.total-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.total-label { font-size: 14px; color: #6b7280; }
+.total-amount {
+  font-size: 32px;
+  font-weight: 700;
+  color: #4f46e5;
+}
+.filter { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.filter input { padding: 6px 10px; }
+
+/* ---------- Forms ---------- */
+form { display: flex; flex-direction: column; gap: 12px; }
+form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #4b5563;
+}
+input, select {
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.btn {
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.05s, opacity 0.2s;
+}
+.btn:hover { opacity: 0.92; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: #4f46e5; color: #fff; }
+.btn-secondary { background: #10b981; color: #fff; }
+
+/* ---------- Summary / progress ---------- */
+.summary-list { display: flex; flex-direction: column; gap: 14px; }
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+.summary-name { font-weight: 600; }
+
+.bar {
+  position: relative;
+  height: 14px;
+  background: #e5e7eb;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  transition: width 0.4s ease;
+}
+.bar-fill.warning { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.bar-fill.danger  { background: linear-gradient(90deg, #ef4444, #b91c1c); }
+
+.summary-pct { font-size: 12px; color: #6b7280; }
+.warning-text { color: #b91c1c; font-weight: 600; }
+
+/* ---------- Table ---------- */
+.table-wrapper { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+th { font-size: 12px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.04em; }
+.right { text-align: right; }
+.muted { color: #9ca3af; text-align: center; padding: 20px; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(120%);
+  background: #1f2937;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease;
+  z-index: 1000;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.error { background: #b91c1c; }
+.toast.success { background: #059669; }
