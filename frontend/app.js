@@ -1,13 +1,12 @@
 /* =========================================================
- *  Expense Tracker – Frontend (multi-page PWA)
+ *  Txerri Txiroa – Expense Tracker PWA
  * ========================================================= */
 
-// 🔧 PASTE your Apps Script Web App URL here (after deploying)
 const API_URL = 'https://script.google.com/macros/s/AKfycbx09lKH5wNjc_A9QY6p_H932omwZU7XbMSrOnHiT1vtbMa9FJB9UbPnWCUAOISMegJX/exec';
 
 const COLORS = [
-  '#4f46e5', '#10b981', '#f59e0b', '#ef4444',
-  '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
+  '#2563eb', '#ec4899', '#10b981', '#f59e0b',
+  '#8b5cf6', '#06b6d4', '#f97316', '#ef4444',
   '#84cc16', '#14b8a6'
 ];
 
@@ -15,39 +14,42 @@ const state = {
   transactions: [],
   limits: [],
   filterMonth: '',
+  filterCategory: '',
   spreadsheetId: localStorage.getItem('spreadsheetId') || ''
 };
 
-// ---------------- DOM refs ----------------
-const $ = (sel) => document.querySelector(sel);
-const expenseForm     = $('#expense-form');
-const categoryForm    = $('#category-form');
-const expCategory     = $('#exp-category');
-const expDate         = $('#exp-date');
-const monthFilter     = $('#month-filter');
-const summaryEl       = $('#category-summary');
-const tableBody       = $('#expenses-table tbody');
-const toastEl         = $('#toast');
-const connectSection  = $('#connect-section');
-const connectedBar    = $('#connected-bar');
-const appContent      = $('#app-content');
-const connectForm     = $('#connect-form');
-const sheetUrlInput   = $('#sheet-url');
-const connectStatus   = $('#connect-status');
-const connectedIdEl   = $('#connected-id');
-const disconnectBtn   = $('#disconnect-btn');
-const bottomNav       = $('#bottom-nav');
-const monthFilterWrap = $('#month-filter-wrap');
-const addModal        = $('#add-modal');
+let doughnutChart = null;
+let trendChart    = null;
+let chartsDirty   = true;
+
+// ---------- DOM refs ----------
+const $ = sel => document.querySelector(sel);
+
+const expenseForm    = $('#expense-form');
+const categoryForm   = $('#category-form');
+const expCategory    = $('#exp-category');
+const expDate        = $('#exp-date');
+const monthFilter    = $('#month-filter');
+const tableBody      = $('#expenses-table tbody');
+const toastEl        = $('#toast');
+const connectSection = $('#connect-section');
+const appContent     = $('#app-content');
+const connectForm    = $('#connect-form');
+const sheetUrlInput  = $('#sheet-url');
+const connectStatus  = $('#connect-status');
+const connectedIdEl  = $('#connected-id');
+const disconnectBtn  = $('#disconnect-btn');
+const bottomNav      = $('#bottom-nav');
+const addModal       = $('#add-modal');
+const fab            = $('#fab');
+const connDot        = $('#conn-dot');
 
 
-// ---------------- API helpers ----------------
+// ---------- API helpers ----------
 
 async function apiGet(action) {
   if (!state.spreadsheetId) throw new Error('No sheet connected');
-  const url = API_URL
-    + '?action=' + encodeURIComponent(action)
-    + '&spreadsheetId=' + encodeURIComponent(state.spreadsheetId);
+  const url = `${API_URL}?action=${encodeURIComponent(action)}&spreadsheetId=${encodeURIComponent(state.spreadsheetId)}`;
   const res  = await fetch(url);
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Request failed');
@@ -68,11 +70,26 @@ async function apiPost(payload) {
 }
 
 
-// ---------------- Sheet connection ----------------
+// ---------- Loading states ----------
+
+function setSubmitting(btn, loading) {
+  btn.disabled = loading;
+  if (loading) {
+    btn.dataset.origText = btn.textContent;
+    btn.textContent = '…';
+  } else {
+    btn.textContent = btn.dataset.origText || btn.textContent;
+  }
+}
+
+
+// ---------- Sheet connection ----------
 
 async function connectSheet(sheetUrl) {
   connectStatus.textContent = 'Connecting…';
   connectStatus.className = 'connect-status';
+  const btn = $('#connect-submit-btn');
+  setSubmitting(btn, true);
   try {
     const res  = await fetch(API_URL, {
       method: 'POST',
@@ -88,6 +105,8 @@ async function connectSheet(sheetUrl) {
   } catch (err) {
     connectStatus.textContent = '❌ ' + err.message;
     connectStatus.className = 'connect-status error';
+  } finally {
+    setSubmitting(btn, false);
   }
 }
 
@@ -97,31 +116,33 @@ function disconnectSheet() {
   state.transactions = [];
   state.limits = [];
   bottomNav.style.display = 'none';
-  monthFilterWrap.style.display = 'none';
+  fab.style.display = 'none';
+  connDot.className = 'conn-dot conn-dot--off';
+  connDot.title = 'No sheet connected';
   showConnectionPanel();
 }
 
 function showApp() {
   connectSection.style.display = 'none';
-  connectedBar.style.display = '';
   appContent.style.display = '';
   bottomNav.style.display = '';
-  monthFilterWrap.style.display = '';
-  connectedIdEl.textContent = state.spreadsheetId;
+  fab.style.display = '';
+  connDot.className = 'conn-dot conn-dot--on';
+  connDot.title = 'Sheet connected';
+  if (connectedIdEl) connectedIdEl.textContent = state.spreadsheetId;
   navigateTo('page1');
   loadData();
 }
 
 function showConnectionPanel() {
   connectSection.style.display = '';
-  connectedBar.style.display = 'none';
   appContent.style.display = 'none';
   connectStatus.textContent = '';
-  sheetUrlInput.value = '';
+  if (sheetUrlInput) sheetUrlInput.value = '';
 }
 
 
-// ---------------- Navigation ----------------
+// ---------- Navigation ----------
 
 function navigateTo(pageId) {
   document.querySelectorAll('.page').forEach(p => { p.style.display = 'none'; });
@@ -129,12 +150,16 @@ function navigateTo(pageId) {
   document.querySelectorAll('.nav-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.page === pageId);
   });
+  if (pageId === 'page2' && chartsDirty) {
+    renderCharts();
+    chartsDirty = false;
+  }
 }
 
 function openAddModal() {
   if (state.limits.length === 0) {
     toast('Create a category first', 'error');
-    navigateTo('page3');
+    navigateTo('page4');
     return;
   }
   expDate.value = todayISO();
@@ -149,7 +174,57 @@ function closeAddModal() {
 }
 
 
-// ---------------- UI helpers ----------------
+// ---------- Filter panel ----------
+
+function openFilterPanel() {
+  const catFilter = $('#cat-filter');
+  catFilter.innerHTML = '<option value="">All categories</option>';
+  state.limits.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.category;
+    opt.textContent = (c.emoji ? c.emoji + ' ' : '') + c.category;
+    catFilter.appendChild(opt);
+  });
+  monthFilter.value = state.filterMonth || todayISO().slice(0, 7);
+  if (state.filterCategory) catFilter.value = state.filterCategory;
+  $('#filter-panel').style.display = 'flex';
+}
+
+function closeFilterPanel() {
+  $('#filter-panel').style.display = 'none';
+}
+
+function applyFilter() {
+  state.filterMonth    = monthFilter.value;
+  state.filterCategory = $('#cat-filter').value;
+  updateFilterBadge();
+  closeFilterPanel();
+  renderPage1();
+  renderYearStats();
+  renderTable();
+  chartsDirty = true;
+}
+
+function clearFilter() {
+  monthFilter.value    = todayISO().slice(0, 7);
+  state.filterMonth    = monthFilter.value;
+  state.filterCategory = '';
+  updateFilterBadge();
+  closeFilterPanel();
+  renderPage1();
+  renderYearStats();
+  renderTable();
+  chartsDirty = true;
+}
+
+function updateFilterBadge() {
+  const badge  = $('#filter-badge');
+  const active = state.filterMonth || state.filterCategory;
+  badge.style.display = active ? '' : 'none';
+}
+
+
+// ---------- UI helpers ----------
 
 function toast(msg, type = 'success') {
   toastEl.textContent = msg;
@@ -180,8 +255,16 @@ function catColor(category) {
   return COLORS[idx >= 0 ? idx % COLORS.length : 0];
 }
 
+function getFilteredTransactions() {
+  return state.transactions.filter(t => {
+    if (state.filterMonth    && monthOf(t.date)  !== state.filterMonth)    return false;
+    if (state.filterCategory && t.category !== state.filterCategory) return false;
+    return true;
+  });
+}
 
-// ---------------- Rendering ----------------
+
+// ---------- Rendering ----------
 
 function renderCategoryOptions() {
   const current = expCategory.value;
@@ -199,97 +282,22 @@ function renderCategoryOptions() {
   if (current) expCategory.value = current;
 }
 
-function getFilteredTransactions() {
-  if (!state.filterMonth) return state.transactions;
-  return state.transactions.filter(t => monthOf(t.date) === state.filterMonth);
+// Page 1 — hero total
+function renderTotalHero() {
+  const tx    = getFilteredTransactions();
+  const total = tx.reduce((s, t) => s + Number(t.amount || 0), 0);
+  $('#total-hero-amount').textContent = fmtMoney(total);
+  const month   = state.filterMonth || todayISO().slice(0, 7);
+  const [y, m]  = month.split('-');
+  const label   = new Date(Number(y), Number(m) - 1)
+    .toLocaleString('default', { month: 'long', year: 'numeric' });
+  $('#hero-month').textContent = label;
 }
 
-// Page 1 — donut chart with monthly total in centre
-function renderDonutChart() {
-  const donutEl  = $('#donut-chart');
-  const legendEl = $('#donut-legend');
-  const tx       = getFilteredTransactions();
-
-  const spentByCat = {};
-  tx.forEach(t => {
-    spentByCat[t.category] = (spentByCat[t.category] || 0) + Number(t.amount || 0);
-  });
-
-  const total = Object.values(spentByCat).reduce((s, v) => s + v, 0);
-  const r = 38, circ = 2 * Math.PI * r;
-
-  if (total === 0) {
-    donutEl.innerHTML = `
-      <circle cx="50" cy="50" r="${r}" fill="none" stroke="#e5e7eb" stroke-width="14"/>
-      <text x="50" y="47" text-anchor="middle" class="donut-val">0.00 €</text>
-      <text x="50" y="60" text-anchor="middle" class="donut-lbl">this month</text>`;
-    legendEl.innerHTML = '<p class="muted" style="text-align:center;padding:8px 0">No expenses this month</p>';
-    return;
-  }
-
-  const entries = Object.entries(spentByCat).sort((a, b) => b[1] - a[1]);
-
-  let startAngle = 0;
-  const circles = entries.map(([cat, amount]) => {
-    const pct    = amount / total;
-    const arcLen = pct * circ;
-    const color  = catColor(cat);
-    // rotate(startAngle - 90) starts the first slice at 12 o'clock
-    const seg = `<circle cx="50" cy="50" r="${r}" fill="none"
-      stroke="${color}" stroke-width="14"
-      stroke-dasharray="${arcLen.toFixed(2)} ${(circ - arcLen).toFixed(2)}"
-      transform="rotate(${(startAngle - 90).toFixed(2)} 50 50)" />`;
-    startAngle += pct * 360;
-    return seg;
-  });
-
-  donutEl.innerHTML = circles.join('') + `
-    <text x="50" y="47" text-anchor="middle" class="donut-val">${fmtMoney(total)}</text>
-    <text x="50" y="60" text-anchor="middle" class="donut-lbl">this month</text>`;
-
-  legendEl.innerHTML = entries.map(([cat, amount]) => {
-    const lim   = state.limits.find(c => c.category === cat);
-    const emoji = lim ? lim.emoji || '' : '';
-    return `<div class="legend-item">
-      <span class="legend-dot" style="background:${catColor(cat)}"></span>
-      <span class="legend-name">${emoji ? emoji + ' ' : ''}${escapeHtml(cat)}</span>
-      <span class="legend-amount">${fmtMoney(amount)}</span>
-    </div>`;
-  }).join('');
-}
-
-// Page 1 — last 5 expenses this month
-function renderRecentExpenses() {
-  const recentEl = $('#recent-list');
-  const emojiMap = {};
-  state.limits.forEach(c => { emojiMap[c.category] = c.emoji || ''; });
-
-  const tx = getFilteredTransactions()
-    .slice()
-    .sort((a, b) => a.date < b.date ? 1 : -1)
-    .slice(0, 5);
-
-  if (tx.length === 0) {
-    recentEl.innerHTML = '<p class="muted">No expenses this month</p>';
-    return;
-  }
-
-  recentEl.innerHTML = tx.map(t => `
-    <div class="recent-item">
-      <div class="recent-left">
-        <span class="recent-emoji">${emojiMap[t.category] || '💳'}</span>
-        <div class="recent-text">
-          <div class="recent-desc">${escapeHtml(t.description || t.category)}</div>
-          <div class="recent-meta">${escapeHtml(t.category)} · ${escapeHtml(t.date)}</div>
-        </div>
-      </div>
-      <span class="recent-amount">−${fmtMoney(t.amount)}</span>
-    </div>`).join('');
-}
-
-// Page 2 — category progress bars
-function renderSummary() {
-  const tx = getFilteredTransactions();
+// Page 1 — budget bars
+function renderBudgetBars() {
+  const listEl     = $('#budget-list');
+  const tx         = getFilteredTransactions();
   const spentByCat = {};
   tx.forEach(t => {
     spentByCat[t.category] = (spentByCat[t.category] || 0) + Number(t.amount || 0);
@@ -306,32 +314,175 @@ function renderSummary() {
   });
 
   if (items.length === 0) {
-    summaryEl.innerHTML = '<p class="muted">No categories yet</p>';
+    listEl.innerHTML = '<p class="muted">No categories yet</p>';
     return;
   }
 
-  summaryEl.innerHTML = items.map(item => {
-    const pct        = item.limit > 0 ? (item.spent / item.limit) * 100 : 0;
-    const pctClamped = Math.min(pct, 100);
-    const cls        = pct >= 100 ? 'danger' : pct >= 75 ? 'warning' : '';
-    const limitText  = item.limit > 0
+  listEl.innerHTML = items.map(item => {
+    const pct  = item.limit > 0 ? (item.spent / item.limit) * 100 : 0;
+    const pctC = Math.min(pct, 100);
+    const cls  = pct >= 100 ? 'danger' : pct >= 75 ? 'warning' : '';
+    const vals = item.limit > 0
       ? `${fmtMoney(item.spent)} / ${fmtMoney(item.limit)}`
-      : `${fmtMoney(item.spent)} (no limit)`;
-    const pctText = item.limit > 0
-      ? `${pct.toFixed(0)}%${pct >= 100 ? ' ⚠️ over budget' : ''}` : '';
-
-    return `<div class="summary-item">
-      <div class="summary-row">
-        <span class="summary-name">${item.emoji ? item.emoji + ' ' : ''}${escapeHtml(item.category)}</span>
-        <span>${limitText}</span>
+      : fmtMoney(item.spent);
+    const pctText = item.limit > 0 ? `${pct.toFixed(0)}%${pct >= 100 ? ' ⚠️' : ''}` : '';
+    return `<div class="budget-item">
+      <div class="budget-row">
+        <span class="budget-name">${item.emoji ? item.emoji + ' ' : ''}${escapeHtml(item.category)}</span>
+        <span class="budget-vals">${vals}</span>
       </div>
-      <div class="bar"><div class="bar-fill ${cls}" style="width:${pctClamped}%"></div></div>
-      <div class="summary-pct ${pct >= 100 ? 'warning-text' : ''}">${pctText}</div>
+      <div class="bar"><div class="bar-fill ${cls}" style="width:${pctC}%"></div></div>
+      ${pctText ? `<div class="budget-pct ${pct >= 100 ? 'over' : ''}">${pctText}</div>` : ''}
     </div>`;
   }).join('');
 }
 
-// Page 2 — full expenses table with delete
+// Page 1 — recent 5 expenses
+function renderRecentExpenses() {
+  const recentEl = $('#recent-list');
+  const emojiMap = {};
+  state.limits.forEach(c => { emojiMap[c.category] = c.emoji || ''; });
+
+  const tx = getFilteredTransactions()
+    .slice().sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 5);
+
+  if (tx.length === 0) {
+    recentEl.innerHTML = '<p class="muted">No expenses</p>';
+    return;
+  }
+  recentEl.innerHTML = tx.map(t => `
+    <div class="recent-item">
+      <div class="recent-left">
+        <div class="recent-emoji">${emojiMap[t.category] || '💳'}</div>
+        <div>
+          <div class="recent-desc">${escapeHtml(t.description || t.category)}</div>
+          <div class="recent-meta">${escapeHtml(t.category)} · ${escapeHtml(t.date)}</div>
+        </div>
+      </div>
+      <span class="recent-amount">−${fmtMoney(t.amount)}</span>
+    </div>`).join('');
+}
+
+function renderPage1() {
+  renderTotalHero();
+  renderBudgetBars();
+  renderRecentExpenses();
+}
+
+// Page 2 — Chart.js charts
+function getLastSixMonths() {
+  const months = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      label: d.toLocaleString('default', { month: 'short', year: '2-digit' }),
+      key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    });
+  }
+  return months;
+}
+
+function renderCharts() {
+  renderDoughnutChart();
+  renderTrendChart();
+}
+
+function renderDoughnutChart() {
+  const ctx        = $('#doughnut-canvas').getContext('2d');
+  const tx         = getFilteredTransactions();
+  const spentByCat = {};
+  tx.forEach(t => {
+    spentByCat[t.category] = (spentByCat[t.category] || 0) + Number(t.amount || 0);
+  });
+
+  const labels = Object.keys(spentByCat);
+  const data   = Object.values(spentByCat);
+  const colors = labels.map(cat => catColor(cat));
+
+  if (doughnutChart) doughnutChart.destroy();
+  doughnutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } },
+        tooltip: { callbacks: { label: c => ` ${fmtMoney(c.parsed)}` } }
+      },
+      cutout: '65%'
+    }
+  });
+}
+
+function renderTrendChart() {
+  const ctx    = $('#trend-canvas').getContext('2d');
+  const months = getLastSixMonths();
+  const totals = months.map(({ key }) =>
+    state.transactions
+      .filter(t => monthOf(t.date) === key)
+      .reduce((s, t) => s + Number(t.amount || 0), 0)
+  );
+
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months.map(m => m.label),
+      datasets: [{
+        label: 'Total (€)',
+        data: totals,
+        backgroundColor: months.map((_, i) => i === months.length - 1 ? '#2563eb' : '#93c5fd'),
+        borderRadius: 8,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${fmtMoney(c.parsed.y)}` } }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: '#f1f5f9' },
+          ticks: { callback: v => v + ' €' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// Page 3 — year total
+function renderYearStats() {
+  const year   = String(new Date().getFullYear());
+  const yearTx = state.transactions.filter(t => (t.date || '').startsWith(year));
+  const total  = yearTx.reduce((s, t) => s + Number(t.amount || 0), 0);
+  $('#year-total-amount').textContent = fmtMoney(total);
+
+  const spentByCat = {};
+  yearTx.forEach(t => {
+    spentByCat[t.category] = (spentByCat[t.category] || 0) + Number(t.amount || 0);
+  });
+
+  $('#year-breakdown').innerHTML = Object.entries(spentByCat)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, amount]) => {
+      const lim   = state.limits.find(c => c.category === cat);
+      const emoji = lim ? lim.emoji || '' : '';
+      return `<div class="year-cat">
+        <span>${emoji ? emoji + ' ' : ''}${escapeHtml(cat)}</span>
+        <span>${fmtMoney(amount)}</span>
+      </div>`;
+    }).join('') || '<p style="opacity:.75;font-size:13px;margin:4px 0">No expenses this year yet</p>';
+}
+
+// Page 3 — expenses table
 function renderTable() {
   const tx = getFilteredTransactions().slice().sort((a, b) => a.date < b.date ? 1 : -1);
 
@@ -356,31 +507,7 @@ function renderTable() {
     </tr>`).join('');
 }
 
-// Page 2 — year total card
-function renderYearStats() {
-  const year   = String(new Date().getFullYear());
-  const yearTx = state.transactions.filter(t => (t.date || '').startsWith(year));
-  const total  = yearTx.reduce((s, t) => s + Number(t.amount || 0), 0);
-  $('#year-total').textContent = fmtMoney(total);
-
-  const spentByCat = {};
-  yearTx.forEach(t => {
-    spentByCat[t.category] = (spentByCat[t.category] || 0) + Number(t.amount || 0);
-  });
-
-  $('#year-breakdown').innerHTML = Object.entries(spentByCat)
-    .sort((a, b) => b[1] - a[1])
-    .map(([cat, amount]) => {
-      const lim   = state.limits.find(c => c.category === cat);
-      const emoji = lim ? lim.emoji || '' : '';
-      return `<div class="year-cat">
-        <span>${emoji ? emoji + ' ' : ''}${escapeHtml(cat)}</span>
-        <span>${fmtMoney(amount)}</span>
-      </div>`;
-    }).join('') || '<p style="opacity:.75;font-size:13px;margin:4px 0">No expenses this year yet</p>';
-}
-
-// Page 3 — categories list with edit / delete
+// Page 4 — categories list
 function renderCategoriesList() {
   const listEl = $('#categories-list');
   if (state.limits.length === 0) {
@@ -394,15 +521,13 @@ function renderCategoriesList() {
       : `<span class="cat-no-limit">no limit</span>`;
     return `<div class="cat-item">
       <div class="cat-info">
-        <span class="legend-dot" style="background:${color}"></span>
+        <span style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;display:inline-block"></span>
         <span class="cat-name">${c.emoji ? c.emoji + ' ' : ''}${escapeHtml(c.category)}</span>
         ${limitBadge}
       </div>
       <div class="cat-actions">
-        <button class="btn-icon" data-action="edit-cat"
-          data-cat="${escapeHtml(c.category)}" title="Edit">✏️</button>
-        <button class="btn-icon btn-icon-danger" data-action="delete-cat"
-          data-cat="${escapeHtml(c.category)}" title="Delete">🗑️</button>
+        <button class="btn-icon" data-action="edit-cat" data-cat="${escapeHtml(c.category)}" title="Edit">✏️</button>
+        <button class="btn-icon btn-icon-danger" data-action="delete-cat" data-cat="${escapeHtml(c.category)}" title="Delete">🗑️</button>
       </div>
     </div>`;
   }).join('');
@@ -410,16 +535,15 @@ function renderCategoriesList() {
 
 function renderAll() {
   renderCategoryOptions();
-  renderDonutChart();
-  renderRecentExpenses();
-  renderSummary();
-  renderTable();
+  renderPage1();
   renderYearStats();
+  renderTable();
   renderCategoriesList();
+  chartsDirty = true;
 }
 
 
-// ---------------- Data loading ----------------
+// ---------- Data loading ----------
 
 async function loadData() {
   try {
@@ -437,7 +561,7 @@ async function loadData() {
 }
 
 
-// ---------------- Delete handlers ----------------
+// ---------- Delete handlers ----------
 
 async function confirmDeleteTransaction(id) {
   if (!id) { toast('Cannot delete: missing ID', 'error'); return; }
@@ -445,11 +569,10 @@ async function confirmDeleteTransaction(id) {
   try {
     await apiPost({ action: 'deleteTransaction', id });
     state.transactions = state.transactions.filter(t => t.id !== id);
-    renderDonutChart();
-    renderRecentExpenses();
-    renderSummary();
-    renderTable();
+    renderPage1();
     renderYearStats();
+    renderTable();
+    chartsDirty = true;
     toast('Expense deleted');
   } catch (err) {
     toast('Error: ' + err.message, 'error');
@@ -478,9 +601,8 @@ function editCategory(category) {
 }
 
 
-// ---------------- Event listeners ----------------
+// ---------- Event listeners ----------
 
-// Delegated listener for all dynamic action buttons
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
@@ -490,17 +612,20 @@ document.addEventListener('click', e => {
   if (action === 'delete-cat') confirmDeleteCategory(cat);
 });
 
-// Navigation tabs
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => navigateTo(btn.dataset.page));
 });
 
-// Add expense modal
-$('#add-btn').addEventListener('click', openAddModal);
+fab.addEventListener('click', openAddModal);
 $('#modal-close').addEventListener('click', closeAddModal);
 $('#modal-backdrop').addEventListener('click', closeAddModal);
 
-// Sheet connection
+$('#filter-btn').addEventListener('click', openFilterPanel);
+$('#filter-close').addEventListener('click', closeFilterPanel);
+$('#filter-backdrop').addEventListener('click', closeFilterPanel);
+$('#filter-apply').addEventListener('click', applyFilter);
+$('#filter-clear').addEventListener('click', clearFilter);
+
 connectForm.addEventListener('submit', async e => {
   e.preventDefault();
   await connectSheet(sheetUrlInput.value.trim());
@@ -512,9 +637,9 @@ disconnectBtn.addEventListener('click', () => {
   }
 });
 
-// Add expense (inside modal)
 expenseForm.addEventListener('submit', async e => {
   e.preventDefault();
+  const btn = $('#exp-submit-btn');
   const payload = {
     action: 'addTransaction',
     transaction: {
@@ -525,30 +650,33 @@ expenseForm.addEventListener('submit', async e => {
     }
   };
   if (!payload.transaction.category) { toast('Pick a category first', 'error'); return; }
+  setSubmitting(btn, true);
   try {
     const saved = await apiPost(payload);
     state.transactions.push(saved);
     closeAddModal();
-    renderDonutChart();
-    renderRecentExpenses();
-    renderSummary();
-    renderTable();
+    renderPage1();
     renderYearStats();
+    renderTable();
+    chartsDirty = true;
     toast('Expense added ✅');
   } catch (err) {
     toast('Error: ' + err.message, 'error');
+  } finally {
+    setSubmitting(btn, false);
   }
 });
 
-// Add / update category
 categoryForm.addEventListener('submit', async e => {
   e.preventDefault();
+  const btn = $('#cat-submit-btn');
   const payload = {
     action:       'addOrUpdateLimit',
     category:     $('#cat-name').value.trim(),
     emoji:        $('#cat-emoji').value.trim(),
     monthlyLimit: parseFloat($('#cat-limit').value) || 0
   };
+  setSubmitting(btn, true);
   try {
     await apiPost(payload);
     state.limits = await apiGet('getLimits');
@@ -557,20 +685,13 @@ categoryForm.addEventListener('submit', async e => {
     toast('Category saved ✅');
   } catch (err) {
     toast('Error: ' + err.message, 'error');
+  } finally {
+    setSubmitting(btn, false);
   }
 });
 
-// Month filter
-monthFilter.addEventListener('change', () => {
-  state.filterMonth = monthFilter.value;
-  renderDonutChart();
-  renderRecentExpenses();
-  renderSummary();
-  renderTable();
-});
 
-
-// ---------------- Init ----------------
+// ---------- Init ----------
 
 (function init() {
   if (API_URL.includes('PASTE_YOUR_WEB_APP_URL_HERE')) {
@@ -585,6 +706,7 @@ monthFilter.addEventListener('change', () => {
   expDate.value     = todayISO();
   monthFilter.value = todayISO().slice(0, 7);
   state.filterMonth = monthFilter.value;
+  updateFilterBadge();
 
   if (state.spreadsheetId) {
     showApp();

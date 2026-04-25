@@ -3,18 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Expense Tracker</title>
+  <title>Txerri Txiroa</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#4f46e5" />
+  <meta name="theme-color" content="#1e3a8a" />
   <link rel="apple-touch-icon" href="icon-192.png" />
 </head>
 <body>
 
   <header class="app-header">
-    <h1>💰 Expenses</h1>
-    <div id="month-filter-wrap" style="display:none">
-      <input type="month" id="month-filter" />
+    <h1>🐷 Txerri Txiroa</h1>
+    <div class="header-actions">
+      <button id="filter-btn" class="btn-icon-header" aria-label="Filter">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+        </svg>
+        <span id="filter-badge" class="filter-badge" style="display:none"></span>
+      </button>
+      <span id="conn-dot" class="conn-dot conn-dot--off" title="No sheet connected"></span>
     </div>
   </header>
 
@@ -22,7 +29,8 @@
 
     <!-- ===== SHEET CONNECTION ===== -->
     <section id="connect-section" class="card connect-card">
-      <h2>🔗 Connect your Google Sheet</h2>
+      <div class="connect-icon">🐷</div>
+      <h2>Connect your Google Sheet</h2>
       <p class="connect-help">
         1. Create an empty Google Sheet in your Drive.<br>
         2. Share it with the Apps Script owner account (Editor access).<br>
@@ -34,19 +42,10 @@
           <input type="url" id="sheet-url"
             placeholder="https://docs.google.com/spreadsheets/d/..." required />
         </label>
-        <button type="submit" class="btn btn-primary">Connect Sheet</button>
+        <button type="submit" class="btn btn-primary btn-full" id="connect-submit-btn">Connect Sheet</button>
       </form>
       <p id="connect-status" class="connect-status"></p>
     </section>
-
-    <!-- ===== CONNECTED BAR ===== -->
-    <div id="connected-bar" class="card connected-bar" style="display:none">
-      <div class="connected-info">
-        <span class="connected-badge">✅ Sheet connected</span>
-        <code id="connected-id" class="sheet-id"></code>
-      </div>
-      <button id="disconnect-btn" class="btn btn-outline">Disconnect</button>
-    </div>
 
     <!-- ===== APP PAGES ===== -->
     <div id="app-content" style="display:none">
@@ -54,15 +53,21 @@
       <!-- PAGE 1: Inicio -->
       <div id="page1" class="page">
 
-        <section class="card donut-card">
-          <div class="donut-wrap">
-            <svg id="donut-chart" viewBox="0 0 100 100" class="donut-svg"></svg>
-          </div>
-          <div id="donut-legend" class="donut-legend"></div>
+        <section class="card hero-card">
+          <div class="hero-label">This month's total</div>
+          <div id="total-hero-amount" class="hero-amount">0.00 €</div>
+          <div id="hero-month" class="hero-month"></div>
         </section>
 
         <section class="card">
-          <h2>🕐 Recent expenses</h2>
+          <h2>Budget</h2>
+          <div id="budget-list" class="budget-list">
+            <p class="muted">No categories yet</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Recent</h2>
           <div id="recent-list" class="recent-list">
             <p class="muted">No expenses this month</p>
           </div>
@@ -70,24 +75,36 @@
 
       </div><!-- #page1 -->
 
-      <!-- PAGE 2: Gastos / Stats -->
+      <!-- PAGE 2: Gráficos -->
       <div id="page2" class="page" style="display:none">
 
-        <section class="card year-card">
-          <div class="year-label">Total this year</div>
-          <div id="year-total" class="year-amount">0.00 €</div>
-          <div id="year-breakdown" class="year-breakdown"></div>
-        </section>
-
         <section class="card">
-          <h2>📊 This month</h2>
-          <div id="category-summary" class="summary-list">
-            <p class="muted">Loading…</p>
+          <h2>By category</h2>
+          <div class="chart-wrap">
+            <canvas id="doughnut-canvas"></canvas>
           </div>
         </section>
 
         <section class="card">
-          <h2>📋 Expenses</h2>
+          <h2>Monthly trend</h2>
+          <div class="chart-wrap chart-bar-wrap">
+            <canvas id="trend-canvas"></canvas>
+          </div>
+        </section>
+
+      </div><!-- #page2 -->
+
+      <!-- PAGE 3: Gastos -->
+      <div id="page3" class="page" style="display:none">
+
+        <section class="card year-card">
+          <div class="year-label">Total this year</div>
+          <div id="year-total-amount" class="year-amount">0.00 €</div>
+          <div id="year-breakdown" class="year-breakdown"></div>
+        </section>
+
+        <section class="card">
+          <h2>Expenses</h2>
           <div class="table-wrapper">
             <table id="expenses-table">
               <thead>
@@ -106,13 +123,13 @@
           </div>
         </section>
 
-      </div><!-- #page2 -->
+      </div><!-- #page3 -->
 
-      <!-- PAGE 3: Categorías -->
-      <div id="page3" class="page" style="display:none">
+      <!-- PAGE 4: Config -->
+      <div id="page4" class="page" style="display:none">
 
         <section class="card">
-          <h2>🏷️ Add / update category</h2>
+          <h2>Add / update category</h2>
           <form id="category-form">
             <label>Name
               <input type="text" id="cat-name" placeholder="Food" required />
@@ -125,22 +142,33 @@
               <input type="number" id="cat-limit" step="0.01" min="0"
                 placeholder="Leave blank = no limit" />
             </label>
-            <button type="submit" class="btn btn-secondary">Save category</button>
+            <button type="submit" class="btn btn-secondary" id="cat-submit-btn">Save category</button>
           </form>
         </section>
 
         <section class="card">
-          <h2>📂 Your categories</h2>
+          <h2>Your categories</h2>
           <div id="categories-list" class="categories-list">
             <p class="muted">No categories yet</p>
           </div>
         </section>
 
-      </div><!-- #page3 -->
+        <section class="card disconnect-card">
+          <div class="disconnect-info">
+            <span class="disconnect-label">Connected sheet</span>
+            <code id="connected-id" class="sheet-id"></code>
+          </div>
+          <button id="disconnect-btn" class="btn btn-danger-outline">Disconnect</button>
+        </section>
+
+      </div><!-- #page4 -->
 
     </div><!-- #app-content -->
 
   </main>
+
+  <!-- ===== FAB ===== -->
+  <button id="fab" class="fab" style="display:none" aria-label="Add expense">＋</button>
 
   <!-- ===== ADD EXPENSE MODAL (bottom sheet) ===== -->
   <div id="add-modal" class="modal" style="display:none">
@@ -148,7 +176,7 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <h2>➕ Add expense</h2>
+        <h2>Add expense</h2>
         <button id="modal-close" class="btn-icon btn-modal-close">✕</button>
       </div>
       <form id="expense-form">
@@ -164,8 +192,32 @@
         <label>Description
           <input type="text" id="exp-description" placeholder="Lunch, taxi…" />
         </label>
-        <button type="submit" class="btn btn-primary btn-full">Add expense</button>
+        <button type="submit" class="btn btn-primary btn-full" id="exp-submit-btn">Add expense</button>
       </form>
+    </div>
+  </div>
+
+  <!-- ===== FILTER PANEL (bottom sheet) ===== -->
+  <div id="filter-panel" class="modal" style="display:none">
+    <div class="modal-backdrop" id="filter-backdrop"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2>Filter</h2>
+        <button id="filter-close" class="btn-icon btn-modal-close">✕</button>
+      </div>
+      <div class="filter-body">
+        <label>Month
+          <input type="month" id="month-filter" />
+        </label>
+        <label>Category
+          <select id="cat-filter">
+            <option value="">All categories</option>
+          </select>
+        </label>
+        <button id="filter-apply" class="btn btn-primary btn-full">Apply</button>
+        <button id="filter-clear" class="btn btn-outline btn-full">Clear filters</button>
+      </div>
     </div>
   </div>
 
@@ -177,16 +229,19 @@
     </button>
     <button class="nav-btn" data-page="page2">
       <span class="nav-icon">📊</span>
+      <span class="nav-label">Gráficos</span>
+    </button>
+    <button class="nav-btn" data-page="page3">
+      <span class="nav-icon">📋</span>
       <span class="nav-label">Gastos</span>
     </button>
-    <button id="add-btn" class="nav-add-btn" aria-label="Add expense">＋</button>
-    <button class="nav-btn" data-page="page3">
-      <span class="nav-icon">🏷️</span>
-      <span class="nav-label">Categorías</span>
+    <button class="nav-btn" data-page="page4">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Config</span>
     </button>
   </nav>
 
-  <div id="toast" class="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
