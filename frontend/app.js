@@ -318,13 +318,27 @@ function renderBudgetBars() {
   }
 
   listEl.innerHTML = items.map(item => {
-    const pct  = item.limit > 0 ? (item.spent / item.limit) * 100 : 0;
+    const hasLimit = item.limit > 0;
+    
+    // Si tiene límite, calculamos el % real. Si NO tiene, el ancho es 100%.
+    const pct  = hasLimit ? (item.spent / item.limit) * 100 : 100;
     const pctC = Math.min(pct, 100);
-    const cls  = pct >= 100 ? 'danger' : pct >= 75 ? 'warning' : '';
-    const vals = item.limit > 0
+    
+    // Determinamos la clase: 
+    // Si no hay límite, usamos 'unlimited'. Si hay, usamos los colores de alerta.
+    let cls = '';
+    if (!hasLimit) {
+      cls = 'unlimited';
+    } else {
+      cls = pct >= 100 ? 'danger' : pct >= 75 ? 'warning' : '';
+    }
+
+    const vals = hasLimit
       ? `${fmtMoney(item.spent)} / ${fmtMoney(item.limit)}`
       : fmtMoney(item.spent);
-    const pctText = item.limit > 0 ? `${pct.toFixed(0)}%${pct >= 100 ? ' ⚠️' : ''}` : '';
+      
+    const pctText = hasLimit ? `${pct.toFixed(0)}%${pct >= 100 ? ' ⚠️' : ''}` : '';
+
     return `<div class="budget-item">
       <div class="budget-row">
         <span class="budget-name">${item.emoji ? item.emoji + ' ' : ''}${escapeHtml(item.category)}</span>
@@ -335,7 +349,6 @@ function renderBudgetBars() {
     </div>`;
   }).join('');
 }
-
 
 function renderPage1() {
   renderTotalHero();

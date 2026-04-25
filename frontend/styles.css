@@ -128,6 +128,11 @@ body {
   border-radius: 4px;
   transition: width 0.5s ease;
 }
+.bar-fill.unlimited {
+  width: 100% !important;
+  background: linear-gradient(90deg, var(--blue-dark), var(--blue-mid));
+}
+
 .bar-fill.warning { background: linear-gradient(90deg, #d97706, var(--warning)); }
 .bar-fill.danger  { background: linear-gradient(90deg, #b91c1c, var(--danger)); }
 
