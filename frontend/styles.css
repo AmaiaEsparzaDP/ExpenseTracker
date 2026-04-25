@@ -434,21 +434,37 @@ tr:hover .btn-icon:hover { opacity: 1; }
 
 .header-filters {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 
-.header-filters input,
-.header-filters select {
-  padding: 6px 8px;
-  font-size: 12px;
+.header-filter-btn {
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
-  border: none;
-  background: rgba(255,255,255,0.2);
-  color: white;
-  max-width: 110px;
+  background: rgba(255,255,255,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.header-filters select option {
+.header-filter-btn:hover {
+  background: rgba(255,255,255,0.28);
+}
+
+.header-filter-btn input,
+.header-filter-btn select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.header-filter-btn select option {
   color: black;
 }

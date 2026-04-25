@@ -127,6 +127,8 @@ function showApp() {
   fab.style.display = '';
   connDot.className = 'conn-dot conn-dot--on';
   connDot.title = 'Sheet connected';
+  const filters = document.querySelector('.header-filters');
+  if (filters) filters.style.display = 'flex';
   if (connectedIdEl) connectedIdEl.textContent = state.spreadsheetId;
   navigateTo('page1');
   loadData();
@@ -136,6 +138,8 @@ function showConnectionPanel() {
   connectSection.style.display = '';
   appContent.style.display = 'none';
   connectStatus.textContent = '';
+  const filters = document.querySelector('.header-filters');
+  if (filters) filters.style.display = 'none';
   if (sheetUrlInput) sheetUrlInput.value = '';
 }
 
