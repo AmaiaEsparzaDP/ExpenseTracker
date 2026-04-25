@@ -508,8 +508,8 @@ function renderCategoriesList() {
       <div class="cat-actions">
         <button class="btn-icon" data-action="edit-cat" data-cat="${escapeHtml(c.category)}" title="Edit">✏️</button>
         <button class="btn-icon btn-icon-danger"
-          data-action="delete-tx"
-          data-id="${escapeHtml(t.id)}"
+          data-action="delete-cat"
+          data-cat="${escapeHtml(c.category)}"
           title="Delete">🗑️</button>
       </div>
     </div>`;
