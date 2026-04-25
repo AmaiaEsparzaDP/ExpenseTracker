@@ -1,11 +1,12 @@
 {
-  "name": "Expense Tracker",
-  "short_name": "Expenses",
-  "description": "Track your personal expenses with your own Google Sheet",
-  "start_url": "./",
+  "name": "Txerri Txiroa",
+  "short_name": "Txerri",
+  "description": "Track your personal expenses",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f7fb",
-  "theme_color": "#4f46e5",
+  "background_color": "#f0f4ff",
+  "theme_color": "#1e3a8a",
   "icons": [
     {
       "src": "txerri_txiroa_192_clean.png",
@@ -16,7 +17,7 @@
       "src": "txerri_txiroa_512_clean.png",
       "sizes": "512x512",
       "type": "image/png"
-    }
+    },
     {
       "src": "txerri_txiroa_192_withoutbackground.png",
       "sizes": "192x192",
