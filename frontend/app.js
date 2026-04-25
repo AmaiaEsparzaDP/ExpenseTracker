@@ -7,7 +7,7 @@
 
 // 🔧 PASTE your Apps Script Web App URL here (after deploying)
 //    Example: https://script.google.com/macros/s/AKfy.../exec
-const API_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
+const API_URL = 'https://docs.google.com/spreadsheets/d/1IaZoku2BqgM1OjiaXg38wDV_ce1T6UMk7w8OCGFLow0/edit?gid=1320133303#gid=1320133303';
 
 // In-memory state — spreadsheetId persists across reloads via localStorage
 const state = {
