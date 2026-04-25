@@ -46,8 +46,13 @@ body {
 .app-header img { flex-shrink: 0; }
 .app-header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
 
-.header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap; /* 🔥 CLAVE */
+}
 .btn-icon-header {
   background: rgba(255, 255, 255, 0.15);
   border: none;
@@ -96,6 +101,29 @@ body {
   margin-bottom: 14px;
 }
 .card h2 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
+
+/* ---------- Inline filter bar ---------- */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.filter-select {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+.filter-select:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
 
 /* ---------- Hero card (page 1) ---------- */
 .hero-card {
@@ -408,3 +436,40 @@ tr:hover .btn-icon:hover { opacity: 1; }
 
 /* ---------- Optional label ---------- */
 .optional { font-size: 11px; color: var(--text-muted); font-weight: normal; margin-left: 4px; }
+
+.header-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.header-filter-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.header-filter-btn:hover {
+  background: rgba(255,255,255,0.28);
+}
+
+.header-filter-btn input,
+.header-filter-btn select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.header-filter-btn select option {
+  color: black;
+}
